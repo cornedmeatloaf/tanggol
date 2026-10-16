@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iloilo City Coffee Shop Guide</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Google Fonts: Outfit & Playfair Display -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            coffee: {
+              50: '#FDFBF7',
+              100: '#F7F1E5',
+              200: '#EADBC8',
+              300: '#DAC0A3',
+              500: '#A07855',
+              700: '#634832',
+              800: '#3D2B1F',
+              900: '#241911',
+            },
+            latte: '#F5EBE0',
+            espresso: '#2B1E16',
+          },
+          fontFamily: {
+            sans: ['Outfit', 'sans-serif'],
+            serif: ['Playfair Display', 'serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Leaflet Map Popup Style */
+    .leaflet-popup-content-wrapper {
+      border-radius: 1rem;
+      padding: 0.25rem;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+      background-color: #FDFBF7;
+    }
+    .leaflet-container {
+      font-family: 'Outfit', sans-serif;
+    }
+    /* Scrollbar Styling */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #F7F1E5;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #DAC0A3;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #A07855;
+    }
+  </style>
+</head>
+<body class="bg-coffee-50 text-coffee-900 font-sans antialiased min-h-screen flex flex-col">
+
+  <!-- Header / Navigation Bar -->
+  <header class="bg-espresso text-coffee-100 shadow-md sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- Logo & Title -->
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-coffee-500 flex items-center justify-center text-coffee-50 shadow-inner">
+          <i class="fa-solid font-bold fa-mug-hot text-xl"></i>
+        </div>
+        <div>
+          <h1 class="font-serif text-xl sm:text-2xl font-bold tracking-tight text-white leading-none">Iloilo Coffee Hub</h1>
+          <p class="text-xs text-coffee-300">Live open hours, routes & menu updates</p>
+        </div>
+      </div>
+
+      <!-- Quick Action Buttons -->
+      <div class="flex items-center gap-2">
+        <button id="openReportModalGlobalBtn" class="flex items-center gap-1.5 bg-coffee-800 hover:bg-coffee-700 text-coffee-200 text-xs sm:text-sm font-medium px-3 py-2 rounded-xl transition duration-200 border border-coffee-700">
+          <i class="fa-solid fa-pen-to-square text-amber-400"></i>
+          <span>Report Price/Hours</span>
+        </button>
+        <button id="locateMeBtn" class="flex items-center gap-2 bg-coffee-500 hover:bg-coffee-700 text-white text-xs sm:text-sm font-medium px-3.5 py-2 rounded-xl transition duration-200 shadow-sm">
+          <i class="fa-solid fa-location-crosshairs text-amber-300"></i>
+          <span>Locate Near Me</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main Content Layout -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col lg:flex-row gap-6">
+
+    <!-- Left Controls & List Panel -->
+    <section class="w-full lg:w-5/12 flex flex-col gap-4 order-2 lg:order-1">
+      
+      <!-- Filters & Search Card -->
+      <div class="bg-white p-4 sm:p-5 rounded-2xl border border-coffee-200 shadow-sm space-y-3.5">
+        
+        <!-- Search Input -->
+        <div class="relative">
+          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-coffee-500"></i>
+          <input type="text" id="searchInput" placeholder="Search by name, area (e.g. La Paz, Jaro, Mandurriao)..." 
+                 class="w-full pl-10 pr-4 py-2.5 bg-coffee-50 border border-coffee-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-coffee-500 transition">
+        </div>
+
+        <!-- Filter Tags / Toggles -->
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+          <!-- Open Now Toggle -->
+          <button id="openNowFilter" class="filter-chip flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-coffee-200 bg-coffee-50 text-coffee-700 font-medium hover:border-coffee-500 transition" data-active="false">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Open Now
+          </button>
+
+          <!-- WiFi Toggle -->
+          <button id="wifiFilter" class="filter-chip flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-coffee-200 bg-coffee-50 text-coffee-700 font-medium hover:border-coffee-500 transition" data-active="false">
+            <i class="fa-solid fa-wifi text-emerald-600"></i> High-Speed WiFi
+          </button>
+
+          <!-- Rating 4.5+ -->
+          <button id="ratingFilter" class="filter-chip flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-coffee-200 bg-coffee-50 text-coffee-700 font-medium hover:border-coffee-500 transition" data-active="false">
+            <i class="fa-solid fa-star text-amber-500"></i> Rating 4.5+
+          </button>
+
+          <!-- Price Select -->
+          <select id="priceFilter" class="px-2.5 py-1.5 rounded-full border border-coffee-200 bg-coffee-50 text-coffee-700 font-medium focus:outline-none focus:ring-2 focus:ring-coffee-500">
+            <option value="all">All Prices</option>
+            <option value="₱">₱ (Under ₱150)</option>
+            <option value="₱₱">₱₱ (₱150 - ₱250)</option>
+            <option value="₱₱₱">₱₱₱ (₱250+)</option>
+          </select>
+        </div>
+
+        <!-- Result counter status -->
+        <div class="flex justify-between items-center text-xs text-coffee-700 pt-1 border-t border-coffee-100">
+          <span>Showing <strong id="resultCount" class="text-coffee-900">0</strong> coffee shops</span>
+          <button id="resetFiltersBtn" class="text-xs text-coffee-500 hover:text-coffee-900 underline">Reset Filters</button>
+        </div>
+      </div>
+
+      <!-- Coffee Shops Cards List Container -->
+      <div id="shopList" class="flex-1 overflow-y-auto max-h-[600px] lg:max-h-[calc(100vh-280px)] pr-1 space-y-4">
+        <!-- Cards will be dynamically rendered here -->
+      </div>
+    </section>
+
+    <!-- Right Interactive Map Panel -->
+    <section class="w-full lg:w-7/12 order-1 lg:order-2 h-[350px] sm:h-[450px] lg:h-[calc(100vh-140px)] sticky top-20">
+      <div class="w-full h-full rounded-2xl overflow-hidden border border-coffee-200 shadow-md relative">
+        <div id="map" class="w-full h-full"></div>
+        
+        <!-- Floating Map Quick Legend -->
+        <div class="absolute bottom-4 left-4 bg-white/90 backdrop-blur-md px-3 py-2 rounded-xl text-xs shadow-md border border-coffee-200 z-[1000] hidden sm:block">
+          <p class="font-semibold text-coffee-800 mb-1">Legend</p>
+          <div class="flex items-center gap-3 text-coffee-700">
+            <span class="flex items-center gap-1"><i class="fa-solid fa-location-dot text-coffee-700"></i> Coffee Shop</span>
+            <span class="flex items-center gap-1"><i class="fa-solid fa-circle text-blue-500"></i> Your Location</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Detail Modal View -->
+  <div id="detailModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[2000] hidden flex items-center justify-center p-4">
+    <div class="bg-white max-w-2xl w-full rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col border border-coffee-200 animate-in fade-in zoom-in duration-200">
+      
+      <!-- Modal Header Banner -->
+      <div class="bg-espresso text-white p-6 relative">
+        <button id="closeModalBtn" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+        <div id="modalStatusBadge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-2"></div>
+        <h2 id="modalTitle" class="text-2xl sm:text-3xl font-serif font-bold mt-1">Coffee Shop Name</h2>
+        <p id="modalNeighborhood" class="text-coffee-300 text-sm mt-0.5"><i class="fa-solid fa-location-dot mr-1 text-amber-400"></i> District, Iloilo City</p>
+      </div>
+
+      <!-- Modal Body (Scrollable) -->
+      <div class="p-6 space-y-5 overflow-y-auto text-sm text-coffee-800">
+        
+        <!-- Ratings & Price Bar -->
+        <div class="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-coffee-50 rounded-2xl border border-coffee-100">
+          <div class="flex items-center gap-2">
+            <span id="modalRating" class="text-amber-500 font-bold text-lg flex items-center gap-1">4.7 <i class="fa-solid fa-star text-sm"></i></span>
+            <span id="modalReviews" class="text-xs text-coffee-500">(320 Google Reviews)</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span id="modalPrice" class="font-bold text-coffee-800 text-base">₱₱</span>
+            <span id="modalHours" class="text-xs px-2.5 py-1 bg-coffee-100 text-coffee-800 rounded-md font-medium"><i class="fa-regular fa-clock mr-1"></i> Open Daily 8 AM - 10 PM</span>
+          </div>
+        </div>
+
+        <!-- Amenities Tags -->
+        <div>
+          <h4 class="font-bold text-coffee-900 mb-2">Amenities & Workspace</h4>
+          <div id="modalAmenities" class="flex flex-wrap gap-2">
+            <!-- Dynamic Tags -->
+          </div>
+        </div>
+
+        <!-- Social Media / Menu Verification Links -->
+        <div class="bg-amber-50/80 p-4 rounded-xl border border-amber-200/80">
+          <h4 class="font-bold text-coffee-900 mb-1 flex items-center gap-1.5">
+            <i class="fa-solid fa-book-open text-coffee-600"></i> Live Menu & Price Updates
+          </h4>
+          <p class="text-xs text-coffee-700 mb-3">Prices and seasonal roasts change frequently. Check their official social media for current menus:</p>
+          <div id="modalSocialLinks" class="flex flex-wrap gap-2">
+            <!-- Dynamic Social Buttons -->
+          </div>
+        </div>
+
+        <!-- Specialties / Best Sellers -->
+        <div>
+          <h4 class="font-bold text-coffee-900 mb-2 flex items-center gap-1.5"><i class="fa-solid fa-fire text-amber-600"></i> Must-Try / Best Sellers</h4>
+          <p id="modalSpecialties" class="bg-coffee-50 p-3 rounded-xl border border-coffee-200 text-coffee-800">
+            Native Batchoy with Brewed Coffee, Cold Brew Latte, Spanish Latte.
+          </p>
+        </div>
+
+        <!-- Commute & How to get there -->
+        <div class="space-y-2">
+          <h4 class="font-bold text-coffee-900 flex items-center gap-1.5"><i class="fa-solid fa-bus text-coffee-600"></i> How to Get There (Commute Guide)</h4>
+          <div class="bg-coffee-50 p-4 rounded-xl border border-coffee-200 space-y-2 text-xs sm:text-sm">
+            <p><strong>Jeepney Routes:</strong> <span id="modalJeepney">La Paz Plaza, Mandurriao Transville</span></p>
+            <p><strong>Landmarks:</strong> <span id="modalLandmark">Near La Paz Market / Public Plaza</span></p>
+            <p class="text-coffee-600 italic mt-1" id="modalCommuteTips">Take any La Paz jeepney from City Proper or SM City.</p>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div>
+          <h4 class="font-bold text-coffee-900 mb-1">About the Spot</h4>
+          <p id="modalDescription" class="text-coffee-700 leading-relaxed">
+            Cozy neighborhood coffee shop with fresh roasts and great study atmosphere.
+          </p>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer Quick Nav & Report Button -->
+      <div class="p-4 bg-coffee-50 border-t border-coffee-200 flex flex-wrap sm:flex-nowrap justify-between gap-3 items-center">
+        <button id="modalReportBtn" class="text-xs text-coffee-600 hover:text-coffee-900 underline flex items-center gap-1">
+          <i class="fa-solid fa-flag"></i> Report price or hour change
+        </button>
+        <a id="modalDirectionsLink" href="#" target="_blank" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-coffee-700 hover:bg-espresso text-white font-medium px-5 py-2.5 rounded-xl transition text-center shadow">
+          <i class="fa-solid fa-diamond-turn-right"></i>
+          Navigate in Google Maps
+        </a>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Community Report Modal -->
+  <div id="reportModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[2100] hidden flex items-center justify-center p-4">
+    <div class="bg-white max-w-md w-full rounded-2xl shadow-2xl overflow-hidden p-6 border border-coffee-200">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="font-serif font-bold text-lg text-coffee-900 flex items-center gap-2">
+          <i class="fa-solid fa-pen-to-square text-coffee-600"></i> Report Update / Correction
+        </h3>
+        <button id="closeReportModalBtn" class="text-coffee-400 hover:text-coffee-800">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+      
+      <form id="reportForm" class="space-y-3.5 text-xs">
+        <div>
+          <label class="block font-semibold text-coffee-800 mb-1">Select Coffee Shop</label>
+          <select id="reportShopSelect" class="w-full p-2.5 bg-coffee-50 border border-coffee-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-coffee-500 text-sm">
+            <!-- Dynamic dropdown options -->
+          </select>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-coffee-800 mb-1">Type of Update</label>
+          <select id="reportType" class="w-full p-2.5 bg-coffee-50 border border-coffee-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-coffee-500 text-sm">
+            <option value="Price Change">Price / Menu Change</option>
+            <option value="Hours Change">Operating Hours Correction</option>
+            <option value="New Amenities">WiFi / Power Socket Update</option>
+            <option value="Other">Other Information</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-coffee-800 mb-1">Details / Corrected Info</label>
+          <textarea id="reportDetails" rows="3" required placeholder="e.g. Spanish Latte is now ₱160, or they close at 11 PM on weekends..."
+                    class="w-full p-2.5 bg-coffee-50 border border-coffee-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-coffee-500 text-xs"></textarea>
+        </div>
+
+        <button type="submit" class="w-full bg-coffee-700 hover:bg-espresso text-white font-medium py-2.5 rounded-xl transition text-center text-sm shadow">
+          Submit Report
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- JavaScript App Logic -->
+  <script>
+    // Coffee Shop Dataset (Iloilo City)
+    // openingHour & closingHour stored in 24-hour integers (e.g., 5 = 5 AM, 19 = 7 PM, 23 = 11 PM)
+    const coffeeShops = [
+      {
+        id: "madge-cafe",
+        name: "Madge Cafe",
+        neighborhood: "La Paz",
+        lat: 10.7078,
+        lng: 122.5695,
+        rating: 4.6,
+        reviewCount: 1420,
+        priceRange: "₱",
+        priceDesc: "Affordable (₱50 - ₱120)",
+        wifi: false,
+        powerSockets: false,
+        openingHour: 5,   // 5:30 AM
+        closingHour: 19,  // 7:00 PM
+        hoursText: "5:30 AM - 7:00 PM Daily",
+        specialties: "Traditional Filtered Native Coffee (Strong/KC), Butter Toast, Batchoy pair",
+        jeepneyRoutes: "La Paz, CPU, Ungka IT Complex, Jaro CPU via Commission Civil",
+        landmark: "Inside La Paz Public Market (near main entrance)",
+        commuteTips: "Hop on any La Paz bound jeepney from City Proper or Diversion Road. Alight at La Paz Market.",
+        description: "An iconic Iloilo institution operating since 1951. Famous for its traditional cloth filter brewing method and personalized tin mug collection for regulars.",
+        mapsUrl: "https://maps.google.com/?q=Madge+Cafe+La+Paz+Iloilo",
+        facebookUrl: "https://www.facebook.com/MadgeCafeOfficial/",
+        instagramUrl: "https://www.instagram.com/explore/locations/256721014/madge-cafe/"
+      },
+      {
+        id: "coftypoint",
+        name: "Coftypoint",
+        neighborhood: "Mandurriao / Diversion Road",
+        lat: 10.7135,
+        lng: 122.5482,
+        rating: 4.7,
+        reviewCount: 380,
+        priceRange: "₱₱",
+        priceDesc: "Mid-Range (₱120 - ₱220)",
+        wifi: true,
+        powerSockets: true,
+        openingHour: 8,   // 8:00 AM
+        closingHour: 23,  // 11:00 PM
+        hoursText: "8:00 AM - 11:00 PM Daily",
+        specialties: "Dirty Matcha, Spanish Latte, Creamy Cold Brew, Artisanal Croissants",
+        jeepneyRoutes: "Mandurriao-SM City, Ungka IT Complex, Hibao-an",
+        landmark: "Along Diversion Road near Smallville Complex & Boarding houses",
+        commuteTips: "Take a Mandurriao or SM City Diversion jeepney. Drop off right across Smallville commercial complex.",
+        description: "A sleek, minimalist coffee shop favorite among students and remote workers. Excellent high-speed WiFi and abundant power outlets.",
+        mapsUrl: "https://maps.google.com/?q=Coftypoint+Iloilo",
+        facebookUrl: "https://www.facebook.com/coftypoint/",
+        instagramUrl: "https://www.instagram.com/coftypoint/"
+      },
+      {
+        id: "neighbor-coffee",
+        name: "Neighbor Coffee",
+        neighborhood: "General Luna / City Proper",
+        lat: 10.6978,
+        lng: 122.5585,
+        rating: 4.8,
+        reviewCount: 290,
+        priceRange: "₱₱",
+        priceDesc: "Mid-Range (₱130 - ₱240)",
+        wifi: true,
+        powerSockets: true,
+        openingHour: 7,   // 7:00 AM
+        closingHour: 21,  // 9:00 PM
+        hoursText: "7:00 AM - 9:00 PM Daily",
+        specialties: "Sea Salt Latte, Filter Coffee Beans, Basque Burnt Cheesecake",
+        jeepneyRoutes: "Villa Baybay, Molo, Timawa, Baluarte",
+        landmark: "Near University of San Agustin (General Luna St.)",
+        commuteTips: "Board any Villa or Molo jeep passing through General Luna St. Get off directly in front of San Agustin.",
+        description: "Warm aesthetic coffee shop with rich wood tones, specialty pour-overs, and a tranquil atmosphere perfect for conversations or light work.",
+        mapsUrl: "https://maps.google.com/?q=Neighbor+Coffee+Iloilo",
+        facebookUrl: "https://www.facebook.com/neighborcoffeeph/",
+        instagramUrl: "https://www.instagram.com/neighborcoffeeph/"
+      },
+      {
+        id: "little-farmers",
+        name: "Little Farmers Coffee",
+        neighborhood: "Festive Walk / Megaworld",
+        lat: 10.7188,
+        lng: 122.5436,
+        rating: 4.5,
+        reviewCount: 510,
+        priceRange: "₱",
+        priceDesc: "Affordable (₱80 - ₱160)",
+        wifi: true,
+        powerSockets: false,
+        openingHour: 10,  // 10:00 AM
+        closingHour: 22,  // 10:00 PM
+        hoursText: "10:00 AM - 10:00 PM Daily",
+        specialties: "Benguet Arabica, Sagada Dark Roast Espresso, Benguet Hazelnut",
+        jeepneyRoutes: "Mandurriao SM City, Festive Walk Transport Hub Jeeps",
+        landmark: "Festive Walk Parade Annex / Megaworld Boulevard",
+        commuteTips: "Take a Festive Walk or SM City Mandurriao jeepney directly to the Iloilo Business Park Transport Hub.",
+        description: "Directly advocates local Filipino coffee farmers. Serves robust single-origin beans sourced from Benguet and Sagada at accessible prices.",
+        mapsUrl: "https://maps.google.com/?q=Little+Farmers+Coffee+Festive+Walk",
+        facebookUrl: "https://www.facebook.com/LittleFarmersCoffeeIloilo/",
+        instagramUrl: "https://www.instagram.com/littlefarmerscoffee/"
+      },
+      {
+        id: "monkey-grounds",
+        name: "Monkey Grounds",
+        neighborhood: "Jaro",
+        lat: 10.7245,
+        lng: 122.5570,
+        rating: 4.7,
+        reviewCount: 410,
+        priceRange: "₱₱",
+        priceDesc: "Mid-Range (₱140 - ₱250)",
+        wifi: true,
+        powerSockets: true,
+        openingHour: 8,   // 8:00 AM
+        closingHour: 22,  // 10:00 PM
+        hoursText: "8:00 AM - 10:00 PM Daily",
+        specialties: "Plant-based Vegan Lattes, Cold Brew Float, Healthy Salad Bowls",
+        jeepneyRoutes: "Jaro CPU, Jaro Liko Tagbak, Quintin Salalas",
+        landmark: "Near Central Philippine University (CPU) Lopez Jaena St.",
+        commuteTips: "Riders can take any Jaro CPU jeepney. Alight near the CPU gate along Lopez Jaena Street.",
+        description: "Eco-friendly cafe focused on sustainability, plant-based options, and organic coffee roasts. Great garden ambiance.",
+        mapsUrl: "https://maps.google.com/?q=Monkey+Grounds+Iloilo",
+        facebookUrl: "https://www.facebook.com/monkeygrounds/",
+        instagramUrl: "https://www.instagram.com/monkeygroundscafe/"
+      },
+      {
+        id: "theodors",
+        name: "Theodor's Coffee",
+        neighborhood: "Molo",
+        lat: 10.6961,
+        lng: 122.5422,
+        rating: 4.6,
+        reviewCount: 230,
+        priceRange: "₱₱",
+        priceDesc: "Mid-Range (₱130 - ₱230)",
+        wifi: true,
+        powerSockets: true,
+        openingHour: 9,   // 9:00 AM
+        closingHour: 22,  // 10:00 PM
+        hoursText: "9:00 AM - 10:00 PM Daily",
+        specialties: "Honeycomb Latte, Signature Salted Caramel, Belgian Waffles",
+        jeepneyRoutes: "Molo Baluarte, Villa Arevalo, Oton",
+        landmark: "Near Molo Church & Molo Plaza Mansion",
+        commuteTips: "Board any Molo or Villa jeepney from downtown. Get off at Molo Plaza and take a short 2-minute walk.",
+        description: "Cozy spot offering artisanal comfort drinks right near historic Molo landmarks. Ideal for quiet afternoon relaxations.",
+        mapsUrl: "https://maps.google.com/?q=Theodors+Coffee+Molo+Iloilo",
+        facebookUrl: "https://www.facebook.com/theodorscoffee/",
+        instagramUrl: "https://www.instagram.com/theodorscoffee/"
+      },
+      {
+        id: "6030-coffee",
+        name: "6030 Coffee Co.",
+        neighborhood: "Villa Arevalo",
+        lat: 10.6865,
+        lng: 122.5270,
+        rating: 4.8,
+        reviewCount: 195,
+        priceRange: "₱₱",
+        priceDesc: "Mid-Range (₱120 - ₱220)",
+        wifi: true,
+        powerSockets: true,
+        openingHour: 13,  // 1:00 PM
+        closingHour: 21,  // 9:00 PM
+        hoursText: "1:00 PM - 9:00 PM Daily",
+        specialties: "Espresso Tonic, Manual Brew V60, Cinnamon Rolls",
+        jeepneyRoutes: "Villa Baybay, Villa Plaza, Oton Anhawan",
+        landmark: "Near Arevalo Plaza & Santo Nino de Arevalo Parish",
+        commuteTips: "Catch a Villa Baybay jeepney from Super or Gen Luna. Stop by Arevalo Plaza.",
+        description: "A hidden gem specialty coffee shop dedicated to light/medium single-origin roasts and precise extraction techniques.",
+        mapsUrl: "https://maps.google.com/?q=6030+Coffee+Iloilo",
+        facebookUrl: "https://www.facebook.com/6030coffeeco/",
+        instagramUrl: "https://www.instagram.com/6030coffeeco/"
+      }
+    ];
+
+    // Global App State
+    let map;
+    let markers = {};
+    let userLocationMarker = null;
+    let activeFilters = {
+      search: "",
+      openNow: false,
+      wifi: false,
+      rating45: false,
+      price: "all"
+    };
+
+    // Calculate real-time Open/Closed status based on current local hour
+    function isShopOpen(shop) {
+      const currentHour = new Date().getHours();
+      return currentHour >= shop.openingHour && currentHour < shop.closingHour;
+    }
+
+    // Initialize Leaflet Map
+    function initMap() {
+      const iloiloCenter = [10.708, 122.552];
+      map = L.map('map', { zoomControl: false }).setView(iloiloCenter, 13);
+
+      L.control.zoom({ position: 'topright' }).addTo(map);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+
+      const coffeeIcon = L.divIcon({
+        className: 'custom-map-pin',
+        html: `
+          <div class="w-9 h-9 rounded-full bg-espresso text-amber-300 flex items-center justify-center border-2 border-white shadow-lg transform transition hover:scale-110">
+            <i class="fa-solid fa-mug-saucer text-sm"></i>
+          </div>
+        `,
+        iconSize: [36, 36],
+        iconAnchor: [18, 36],
+        popupAnchor: [0, -32]
+      });
+
+      coffeeShops.forEach(shop => {
+        const marker = L.marker([shop.lat, shop.lng], { icon: coffeeIcon }).addTo(map);
+        const open = isShopOpen(shop);
+        
+        const popupContent = `
+          <div class="p-1 max-w-[220px]">
+            <div class="flex items-center justify-between gap-1 mb-1">
+              <span class="text-[10px] uppercase font-bold text-coffee-500 tracking-wider">${shop.neighborhood}</span>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${open ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+                ${open ? 'Open Now' : 'Closed'}
+              </span>
+            </div>
+            <h3 class="font-bold text-coffee-900 text-sm leading-tight">${shop.name}</h3>
+            <div class="flex items-center gap-1.5 text-xs text-amber-600 font-semibold my-1">
+              <span>${shop.rating} ★</span>
+              <span class="text-coffee-700 font-normal">(${shop.reviewCount})</span>
+              <span class="text-coffee-800 ml-auto font-bold">${shop.priceRange}</span>
+            </div>
+            <button onclick="openShopModal('${shop.id}')" class="w-full mt-2 bg-coffee-700 hover:bg-espresso text-white text-xs font-medium py-1.5 rounded-lg transition text-center block">
+              View Full Details
+            </button>
+          </div>
+        `;
+
+        marker.bindPopup(popupContent);
+        markers[shop.id] = marker;
+      });
+    }
+
+    // Filter Logic
+    function getFilteredShops() {
+      return coffeeShops.filter(shop => {
+        const q = activeFilters.search.toLowerCase();
+        const matchesSearch = !q || 
+          shop.name.toLowerCase().includes(q) || 
+          shop.neighborhood.toLowerCase().includes(q) ||
+          shop.specialties.toLowerCase().includes(q);
+
+        const isOpen = isShopOpen(shop);
+        const matchesOpenNow = !activeFilters.openNow || isOpen;
+        const matchesWifi = !activeFilters.wifi || shop.wifi;
+        const matchesRating = !activeFilters.rating45 || shop.rating >= 4.5;
+        const matchesPrice = activeFilters.price === "all" || shop.priceRange === activeFilters.price;
+
+        return matchesSearch && matchesOpenNow && matchesWifi && matchesRating && matchesPrice;
+      });
+    }
+
+    // Render Cards List
+    function renderList() {
+      const filtered = getFilteredShops();
+      const container = document.getElementById("shopList");
+      document.getElementById("resultCount").textContent = filtered.length;
+
+      coffeeShops.forEach(shop => {
+        const isVisible = filtered.some(f => f.id === shop.id);
+        if (markers[shop.id]) {
+          if (isVisible) {
+            markers[shop.id].addTo(map);
+          } else {
+            map.removeLayer(markers[shop.id]);
+          }
+        }
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="bg-white p-8 rounded-2xl border border-coffee-200 text-center">
+            <i class="fa-solid fa-mug-hot text-4xl text-coffee-300 mb-2"></i>
+            <p class="text-coffee-700 font-medium">No coffee shops found matching filters.</p>
+            <p class="text-xs text-coffee-700 mt-1">Try resetting filters or changing search keywords.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.map(shop => {
+        const open = isShopOpen(shop);
+        return `
+          <div class="shop-card bg-white p-4 sm:p-5 rounded-2xl border border-coffee-200 hover:border-coffee-500 shadow-sm hover:shadow-md transition duration-200 flex flex-col justify-between cursor-pointer"
+               onclick="focusShopOnMap('${shop.id}')">
+            
+            <div>
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <div class="flex items-center gap-2 mb-0.5">
+                    <span class="text-[11px] font-semibold text-coffee-500 uppercase tracking-wide">${shop.neighborhood}</span>
+                    <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${open ? 'bg-emerald-100 text-emerald-800' : 'bg-stone-200 text-stone-700'}">
+                      <span class="w-1.5 h-1.5 rounded-full ${open ? 'bg-emerald-600' : 'bg-stone-500'}"></span>
+                      ${open ? 'OPEN NOW' : 'CLOSED'}
+                    </span>
+                  </div>
+                  <h3 class="font-serif font-bold text-lg text-coffee-900 leading-snug">${shop.name}</h3>
+                </div>
+                <span class="bg-coffee-100 text-coffee-800 text-xs font-bold px-2.5 py-1 rounded-lg shrink-0">${shop.priceRange}</span>
+              </div>
+
+              <!-- Ratings & Hours -->
+              <div class="flex items-center justify-between gap-2 mt-2 text-xs">
+                <span class="text-amber-500 font-bold flex items-center gap-1">
+                  ${shop.rating} <i class="fa-solid fa-star text-[10px]"></i>
+                  <span class="text-coffee-700 font-normal">(${shop.reviewCount})</span>
+                </span>
+                <span class="text-coffee-600 text-[11px]"><i class="fa-regular fa-clock mr-1"></i>${shop.hoursText}</span>
+              </div>
+
+              <!-- Must Try teaser -->
+              <p class="text-xs text-coffee-700 mt-2.5 line-clamp-2">
+                <strong class="text-coffee-800">Best Seller:</strong> ${shop.specialties}
+              </p>
+
+              <!-- Tags -->
+              <div class="flex flex-wrap gap-1.5 mt-3">
+                ${shop.wifi 
+                  ? '<span class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[11px] px-2 py-0.5 rounded-md border border-emerald-200/60"><i class="fa-solid fa-wifi text-[10px]"></i> WiFi</span>' 
+                  : '<span class="inline-flex items-center gap-1 bg-gray-50 text-gray-400 text-[11px] px-2 py-0.5 rounded-md border border-gray-200/60"><i class="fa-solid fa-ban text-[10px]"></i> No WiFi</span>'}
+                
+                ${shop.powerSockets 
+                  ? '<span class="inline-flex items-center gap-1 bg-amber-50 text-amber-800 text-[11px] px-2 py-0.5 rounded-md border border-amber-200/60"><i class="fa-solid fa-plug text-[10px]"></i> Sockets</span>' 
+                  : ''}
+              </div>
+            </div>
+
+            <!-- Bottom Action Buttons -->
+            <div class="flex items-center gap-2 mt-4 pt-3 border-t border-coffee-100" onclick="event.stopPropagation()">
+              <button onclick="openShopModal('${shop.id}')" class="flex-1 bg-coffee-100 hover:bg-coffee-200 text-coffee-800 text-xs font-semibold py-2 rounded-xl transition text-center">
+                View Details
+              </button>
+              <a href="${shop.mapsUrl}" target="_blank" class="bg-coffee-700 hover:bg-espresso text-white text-xs font-medium px-3 py-2 rounded-xl transition flex items-center gap-1">
+                <i class="fa-solid fa-directions"></i> Route
+              </a>
+            </div>
+
+          </div>
+        `;
+      }).join('');
+    }
+
+    function focusShopOnMap(id) {
+      const shop = coffeeShops.find(s => s.id === id);
+      if (shop && map && markers[id]) {
+        map.flyTo([shop.lat, shop.lng], 16, { duration: 1.2 });
+        markers[id].openPopup();
+      }
+    }
+
+    // Open Shop Detail Modal
+    function openShopModal(id) {
+      const shop = coffeeShops.find(s => s.id === id);
+      if (!shop) return;
+
+      const open = isShopOpen(shop);
+      const statusBadge = document.getElementById("modalStatusBadge");
+      if (open) {
+        statusBadge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500 text-white";
+        statusBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-white animate-pulse"></span> Open Now`;
+      } else {
+        statusBadge.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-stone-600 text-white";
+        statusBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-stone-400"></span> Closed Now`;
+      }
+
+      document.getElementById("modalTitle").textContent = shop.name;
+      document.getElementById("modalNeighborhood").innerHTML = `<i class="fa-solid fa-location-dot mr-1 text-amber-400"></i> ${shop.neighborhood}, Iloilo City`;
+      document.getElementById("modalRating").innerHTML = `${shop.rating} <i class="fa-solid fa-star text-sm"></i>`;
+      document.getElementById("modalReviews").textContent = `(${shop.reviewCount} Google Reviews)`;
+      document.getElementById("modalPrice").textContent = `${shop.priceRange} - ${shop.priceDesc}`;
+      document.getElementById("modalHours").innerHTML = `<i class="fa-regular fa-clock mr-1"></i> ${shop.hoursText}`;
+      
+      const amenitiesContainer = document.getElementById("modalAmenities");
+      amenitiesContainer.innerHTML = `
+        <span class="${shop.wifi ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-gray-100 text-gray-500 border-gray-200'} border px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5">
+          <i class="fa-solid fa-wifi"></i> ${shop.wifi ? 'High-Speed WiFi Available' : 'No WiFi'}
+        </span>
+        <span class="${shop.powerSockets ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-gray-100 text-gray-500 border-gray-200'} border px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1.5">
+          <i class="fa-solid fa-plug"></i> ${shop.powerSockets ? 'Power Outlets Accessible' : 'Limited Power Outlets'}
+        </span>
+      `;
+
+      // Social Links for verifying menus
+      const socialLinksContainer = document.getElementById("modalSocialLinks");
+      socialLinksContainer.innerHTML = `
+        ${shop.facebookUrl ? `<a href="${shop.facebookUrl}" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition"><i class="fa-brands fa-facebook"></i> Facebook Page</a>` : ''}
+        ${shop.instagramUrl ? `<a href="${shop.instagramUrl}" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-pink-600 hover:bg-pink-700 text-white rounded-lg text-xs font-medium transition"><i class="fa-brands fa-instagram"></i> Instagram Menu</a>` : ''}
+      `;
+
+      document.getElementById("modalSpecialties").textContent = shop.specialties;
+      document.getElementById("modalJeepney").textContent = shop.jeepneyRoutes;
+      document.getElementById("modalLandmark").textContent = shop.landmark;
+      document.getElementById("modalCommuteTips").textContent = shop.commuteTips;
+      document.getElementById("modalDescription").textContent = shop.description;
+      document.getElementById("modalDirectionsLink").href = shop.mapsUrl;
+
+      // Report button link in modal
+      document.getElementById("modalReportBtn").onclick = () => {
+        document.getElementById("detailModal").classList.add("hidden");
+        openReportModal(shop.id);
+      };
+
+      document.getElementById("detailModal").classList.remove("hidden");
+    }
+
+    // Community Report Modal Logic
+    function openReportModal(preselectedShopId = "") {
+      const select = document.getElementById("reportShopSelect");
+      select.innerHTML = coffeeShops.map(s => `<option value="${s.id}" ${s.id === preselectedShopId ? 'selected' : ''}>${s.name} (${s.neighborhood})</option>`).join('');
+      document.getElementById("reportModal").classList.remove("hidden");
+    }
+
+    // Geolocation API - "Locate Me"
+    function locateUser() {
+      if (!navigator.geolocation) {
+        alert("Geolocation is not supported by your browser.");
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+
+          map.flyTo([lat, lng], 15);
+
+          if (userLocationMarker) {
+            userLocationMarker.setLatLng([lat, lng]);
+          } else {
+            const userIcon = L.divIcon({
+              className: 'user-pin',
+              html: `
+                <div class="relative flex items-center justify-center w-7 h-7">
+                  <div class="absolute w-7 h-7 bg-blue-500/30 rounded-full animate-ping"></div>
+                  <div class="w-4 h-4 bg-blue-600 rounded-full border-2 border-white shadow-md"></div>
+                </div>
+              `,
+              iconSize: [28, 28]
+            });
+            userLocationMarker = L.marker([lat, lng], { icon: userIcon }).addTo(map);
+            userLocationMarker.bindPopup("<b>You are here!</b>").openPopup();
+          }
+        },
+        (error) => {
+          alert("Unable to retrieve location. Please check browser permissions.");
+        }
+      );
+    }
+
+    // Event Listeners Setup
+    function setupEventListeners() {
+      document.getElementById("searchInput").addEventListener("input", (e) => {
+        activeFilters.search = e.target.value;
+        renderList();
+      });
+
+      const toggleFilter = (btnId, filterKey) => {
+        const btn = document.getElementById(btnId);
+        btn.addEventListener("click", () => {
+          activeFilters[filterKey] = !activeFilters[filterKey];
+          btn.classList.toggle("bg-coffee-700", activeFilters[filterKey]);
+          btn.classList.toggle("text-white", activeFilters[filterKey]);
+          btn.classList.toggle("bg-coffee-50", !activeFilters[filterKey]);
+          renderList();
+        });
+      };
+
+      toggleFilter("openNowFilter", "openNow");
+      toggleFilter("wifiFilter", "wifi");
+      toggleFilter("ratingFilter", "rating45");
+
+      document.getElementById("priceFilter").addEventListener("change", (e) => {
+        activeFilters.price = e.target.value;
+        renderList();
+      });
+
+      document.getElementById("locateMeBtn").addEventListener("click", locateUser);
+
+      document.getElementById("resetFiltersBtn").addEventListener("click", () => {
+        activeFilters = { search: "", openNow: false, wifi: false, rating45: false, price: "all" };
+        document.getElementById("searchInput").value = "";
+        document.getElementById("priceFilter").value = "all";
+        
+        ['openNowFilter', 'wifiFilter', 'ratingFilter'].forEach(id => {
+          const btn = document.getElementById(id);
+          btn.classList.remove("bg-coffee-700", "text-white");
+          btn.classList.add("bg-coffee-50");
+        });
+
+        renderList();
+        map.flyTo([10.708, 122.552], 13);
+      });
+
+      document.getElementById("closeModalBtn").addEventListener("click", () => {
+        document.getElementById("detailModal").classList.add("hidden");
+      });
+
+      document.getElementById("detailModal").addEventListener("click", (e) => {
+        if (e.target.id === "detailModal") {
+          document.getElementById("detailModal").classList.add("hidden");
+        }
+      });
+
+      // Report Modal Listeners
+      document.getElementById("openReportModalGlobalBtn").addEventListener("click", () => openReportModal());
+      document.getElementById("closeReportModalBtn").addEventListener("click", () => {
+        document.getElementById("reportModal").classList.add("hidden");
+      });
+
+      document.getElementById("reportForm").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const shopId = document.getElementById("reportShopSelect").value;
+        const reportType = document.getElementById("reportType").value;
+        const details = document.getElementById("reportDetails").value;
+
+        // Store locally
+        const existingReports = JSON.parse(localStorage.getItem("iloilo_coffee_reports") || "[]");
+        existingReports.push({ shopId, reportType, details, timestamp: new Date().toISOString() });
+        localStorage.setItem("iloilo_coffee_reports", JSON.stringify(existingReports));
+
+        alert("Thank you! Your update report has been submitted successfully for verification.");
+        document.getElementById("reportDetails").value = "";
+        document.getElementById("reportModal").classList.add("hidden");
+      });
+    }
+
+    // Initialize Application
+    window.onload = function() {
+      initMap();
+      renderList();
+      setupEventListeners();
+    };
+  </script>
+</body>
+</html>
